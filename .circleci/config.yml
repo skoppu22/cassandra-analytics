@@ -68,7 +68,7 @@ commands:
           command: |
             export GRADLE_OPTS="-Xmx2g -Dorg.gradle.jvmargs=-Xmx2g"
             # Run compile/unit tests, skipping integration tests
-            ./gradlew --no-daemon --max-workers=2 --stacktrace clean assemble check -x cassandra-analytics-integration-tests:test -Dcassandra.analytics.bridges.sstable_format=<<parameters.sstable_format>>
+            ./gradlew --no-daemon --stacktrace clean assemble check -x cassandra-analytics-integration-tests:test -Dcassandra.analytics.bridges.sstable_format=<<parameters.sstable_format>>
 
   run_integration:
     parameters:
@@ -98,7 +98,7 @@ commands:
             export DTEST_JAR="dtest-<< parameters.cassandra >>.jar"
             export CASSANDRA_VERSION=$(echo << parameters.cassandra >> | cut -d'.' -f 1,2)
             # Run compile but not unit tests (which are run in run_build)
-            ./gradlew --no-daemon --max-workers=2 --stacktrace clean assemble
+            ./gradlew --no-daemon --stacktrace clean assemble
             # Run integration tests in parallel
             cd cassandra-analytics-integration-tests/src/test/java
             # Get list of classnames of tests that should run on this node
@@ -134,7 +134,7 @@ jobs:
           name: Build dependencies for jdk11 builds
           command: |
             CASSANDRA_USE_JDK11=true ./scripts/build-dependencies.sh
-            ./gradlew --no-daemon --max-workers=2 codeCheckTasks
+            ./gradlew --no-daemon codeCheckTasks
       - persist_to_workspace:
           root: dependencies
           paths:
