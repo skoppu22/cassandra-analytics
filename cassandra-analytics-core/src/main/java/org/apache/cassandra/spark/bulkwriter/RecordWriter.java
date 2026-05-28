@@ -93,7 +93,7 @@ public class RecordWriter
      */
     public RecordWriter(BulkWriterConfig config, String[] columnNames)
     {
-        this(BulkWriterContext.from(config), columnNames, TaskContext::get, SortedSSTableWriter::new);
+        this(config.toBulkWriterContext(), columnNames, TaskContext::get, SortedSSTableWriter::new);
     }
 
     @VisibleForTesting
@@ -393,8 +393,8 @@ public class RecordWriter
             }
 
             // Convert tuples to TupleValue for CQLSSTableWriter
-            // - Direct tuple columns: Object[] → TupleValue
-            // - Collections with tuples: List<Object[]> → List<TupleValue> (via collection's convertForCqlWriter)
+            // - Direct tuple columns: Object[] -&gt; TupleValue
+            // - Collections with tuples: List<Object[]> -&gt; List<TupleValue> (via collection's convertForCqlWriter)
             CqlField field = cqlTable.getField(columnName);
             if (field != null && columnValue != null)
             {
