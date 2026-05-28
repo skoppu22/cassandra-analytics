@@ -21,6 +21,7 @@ package org.apache.cassandra.analytics.dockertests;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
@@ -36,12 +37,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Port of {@code dockertests/tests/sbr/test_static.py}: verifies the bulk reader correctly surfaces
  * the customer-facing STATIC column semantic — a static cell is partition-scoped, so every
- * clustering row of the partition reads back the same static value.
+ * clustering row of the partition reads back the same static value, and last-write-wins applies
+ * across the partition's static cell.
+ *
+ * <p>The dockertest writes a fresh random static on every insert; the read-side expected value is
+ * therefore the <em>last</em> static written for each partition. This port mirrors that — each
+ * inner INSERT picks a new random static, and {@code expectedStaticByPartition} is overwritten on
+ * every insert so the final entry is the last-written value. Cassandra's LWW resolution on the
+ * static cell is what surfaces that value on read; if LWW for statics regressed, every clustering
+ * row of the partition would still report the same static (because static cells are
+ * partition-scoped), but it would no longer equal the last-written value.
  *
  * <p>{@code BulkReaderTest.testReadNullStaticColumn} exercises STATIC schema and null-handling but
  * uses one clustering row per partition, so the shared-across-clustering-rows behaviour isn't
  * exercised. This test fills that gap by writing multiple clustering rows per partition and
- * asserting all of them read back the partition's static value.
+ * asserting all of them read back the partition's last-written static value.
  */
 class StaticColumnSharedValueReadTest extends DockertestBase
 {
@@ -98,18 +108,20 @@ class StaticColumnSharedValueReadTest extends DockertestBase
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
         createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint static, d bigint, "
                                + "PRIMARY KEY (a, b));");
+        disableAutoCompaction(table);
 
-        // Pre-populate per-partition static values so each clustering-row INSERT sets the same
-        // static and the assertion can compare against a known map. Using deterministic seeds so
-        // failures reproduce.
+        // Mirror the dockertest: pick a fresh random static on every insert; the partition's
+        // expected static is the LAST value written (Cassandra resolves the static cell as LWW).
+        // Seeded RNG for reproducibility on failure.
+        Random random = new Random(0);
         for (long partitionKey = 0; partitionKey < NUM_PARTITIONS; partitionKey++)
         {
-            long staticValue = 100_000L + partitionKey;
-            expectedStaticByPartition.put(partitionKey, staticValue);
             for (long clusteringKey = 0; clusteringKey < NUM_CLUSTERING_ROWS; clusteringKey++)
             {
+                long staticValue = Math.abs(random.nextLong()) % 100_000_000L;
                 long regularValue = partitionKey * 1000 + clusteringKey;
                 expectedRegularValue.put(partitionKey + ":" + clusteringKey, regularValue);
+                expectedStaticByPartition.put(partitionKey, staticValue);
                 execute(String.format("INSERT INTO %s (a, b, c, d) VALUES (%d, %d, %d, %d);",
                                       table, partitionKey, clusteringKey, staticValue, regularValue));
             }

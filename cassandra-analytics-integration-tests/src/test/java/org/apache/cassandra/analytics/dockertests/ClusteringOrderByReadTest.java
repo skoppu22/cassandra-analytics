@@ -67,6 +67,7 @@ class ClusteringOrderByReadTest extends DockertestBase
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
         createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, " +
                                "PRIMARY KEY (a, b)) WITH CLUSTERING ORDER BY (b DESC);");
+        disableAutoCompaction(table);
 
         Random random = new Random(0);
         long partitionKey = 0;

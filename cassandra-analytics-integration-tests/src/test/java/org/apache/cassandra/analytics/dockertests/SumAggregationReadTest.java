@@ -36,6 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Port of {@code dockertests/tests/sbr/test_aggregation.py}: bulk reads a multi-SSTable table
  * and verifies {@code SUM(c)} via Spark matches the sum of values written via CQL.
+ *
+ * <p><b>Flush cadence:</b> the original Python flushes once outside its outer loop (producing a
+ * single SSTable despite the {@code NUM_SSTABLES} name); this port flushes per outer iteration
+ * so {@code NUM_SSTABLES} SSTables are actually produced and the bulk reader's multi-SSTable
+ * merge path is exercised.
  */
 class SumAggregationReadTest extends DockertestBase
 {
@@ -59,6 +64,7 @@ class SumAggregationReadTest extends DockertestBase
     {
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
         createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b));");
+        disableAutoCompaction(table);
 
         Random random = new Random(0);
         long partitionKey = 0;

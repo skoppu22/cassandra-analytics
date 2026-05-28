@@ -38,6 +38,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Port of {@code dockertests/tests/sbr/test_rows.py}: inserts rows across multiple SSTables
  * (flushing between batches) and asserts the bulk reader returns every (a,b) -> c triple.
+ *
+ * <p><b>Flush cadence:</b> the original {@code test_rows.py} calls {@code flush_data()} outside
+ * its outer SSTable loop, producing only one SSTable despite the {@code NUM_SSTABLES} name.
+ * This port flushes per outer iteration so {@code NUM_SSTABLES} is honoured — matching the
+ * cadence used by the better-written {@code test_udts.py}/{@code test_nested.py} dockertests
+ * in the same suite and exercising the multi-SSTable merge path.
  */
 class BasicRowsReadTest extends DockertestBase
 {
@@ -69,6 +75,7 @@ class BasicRowsReadTest extends DockertestBase
     {
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
         createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b));");
+        disableAutoCompaction(table);
 
         Random random = new Random(0);
         long partitionKey = 0;

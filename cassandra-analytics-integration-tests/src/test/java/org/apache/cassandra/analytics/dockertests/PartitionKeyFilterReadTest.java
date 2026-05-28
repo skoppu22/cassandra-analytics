@@ -45,6 +45,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>The OSS bulk reader's {@code CassandraDataSource} accepts partition-key predicates as standard
  * Spark filters; this test uses {@code Dataset#filter} to mirror the original Python which passed a
  * {@code filter_exp} param to the SBR Spark job.
+ *
+ * <p><b>Flush cadence:</b> the original Python flushes once outside its outer loop (producing a
+ * single SSTable despite the {@code NUM_SSTABLES} name); this port flushes per outer iteration
+ * so {@code NUM_SSTABLES} SSTables are actually produced and the bulk reader's multi-SSTable
+ * merge path is exercised.
  */
 class PartitionKeyFilterReadTest extends DockertestBase
 {
@@ -95,6 +100,7 @@ class PartitionKeyFilterReadTest extends DockertestBase
     {
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
         createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b));");
+        disableAutoCompaction(table);
 
         Random random = new Random(0);
         long partitionKey = 0;

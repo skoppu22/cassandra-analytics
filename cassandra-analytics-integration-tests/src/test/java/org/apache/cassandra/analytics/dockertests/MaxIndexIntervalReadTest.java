@@ -37,11 +37,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code max_index_interval=4096 AND min_index_interval=32}, loads a larger dataset across
  * multiple SSTables, and performs a bulk read.
  *
- * <p>The original Python test scanned Spark stdout for the string
- * "Cannot read index summary because min_index_interval changed from" and failed if present.
- * In-process we cannot (cleanly) scan the bulk reader's log output; instead this test asserts the
- * bulk read completes and returns the expected row count — i.e. the reader does not bail out on
- * tables with custom index intervals.
+ * <p><b>Coverage scope.</b> The original Python test grepped Spark stdout for the warning
+ * "Cannot read index summary because min_index_interval changed from" and failed if present —
+ * a regression check for an index-summary loading bug. That log-grep cannot be reproduced
+ * in-process because the warning originates inside the dtest-bridge classloader. This port
+ * therefore covers only:
+ * <ul>
+ *   <li>that the bulk reader does not error or bail out on a table with non-default index
+ *       intervals, and</li>
+ *   <li>that the read returns the expected row count.</li>
+ * </ul>
+ * It does <b>not</b> catch a regression that re-introduces the warning while still returning
+ * correct rows. Restoring full regression coverage requires test-framework log-capture support.
+ *
+ * <p><b>Flush cadence:</b> the original Python flushes once outside its outer loop (producing a
+ * single SSTable despite the {@code NUM_SSTABLES} name); this port flushes per outer iteration
+ * so {@code NUM_SSTABLES} SSTables are actually produced and the bulk reader's multi-SSTable
+ * merge path is exercised.
  */
 class MaxIndexIntervalReadTest extends DockertestBase
 {
@@ -65,6 +77,7 @@ class MaxIndexIntervalReadTest extends DockertestBase
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
         createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b)) "
                                + "WITH max_index_interval=4096 AND min_index_interval=32;");
+        disableAutoCompaction(table);
 
         Random random = new Random(0);
         long partitionKey = 0;

@@ -43,6 +43,24 @@ abstract class DockertestBase extends SharedClusterSparkIntegrationTestBase
         flushKeyspace(table.keyspace());
     }
 
+    /**
+     * Disable auto-compaction for {@code keyspace} on every node, mirroring the dockertests'
+     * {@code nodetool disableautocompaction <keyspace>} call. Without this, background compaction
+     * can merge the per-batch SSTables created by {@link #flushKeyspace(QualifiedName)} between the
+     * last flush and the bulk reader's snapshot, silently degrading the test from a multi-SSTable
+     * merge read to a single-SSTable read.
+     */
+    protected void disableAutoCompaction(String keyspace)
+    {
+        cluster.stream().forEach(instance ->
+            instance.nodetoolResult("disableautocompaction", keyspace).asserts().success());
+    }
+
+    protected void disableAutoCompaction(QualifiedName table)
+    {
+        disableAutoCompaction(table.keyspace());
+    }
+
     protected void execute(String query)
     {
         ICoordinator coordinator = cluster.getFirstRunningInstance().coordinator();

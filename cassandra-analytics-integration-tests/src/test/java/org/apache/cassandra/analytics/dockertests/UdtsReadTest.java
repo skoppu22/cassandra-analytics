@@ -117,6 +117,7 @@ class UdtsReadTest extends DockertestBase
             TEST_KEYSPACE));
         createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b frozen<test_udt1>, c frozen<test_udt2>, "
                                + "PRIMARY KEY (a));");
+        disableAutoCompaction(table);
 
         Random random = new Random(0);
         for (int s = 0; s < NUM_SSTABLES; s++)

@@ -79,6 +79,7 @@ class TableUnionReadTest extends DockertestBase
         String ddl = "CREATE TABLE IF NOT EXISTS %s (pk1 bigint, col1 text, PRIMARY KEY (pk1));";
         createTestTable(table1, ddl);
         createTestTable(table2, ddl);
+        disableAutoCompaction(table1);
 
         for (Object[] v : VALUES_1)
             execute(String.format("INSERT INTO %s (pk1, col1) VALUES (%d, '%s');", table1, (long) v[0], v[1]));

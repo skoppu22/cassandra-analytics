@@ -37,11 +37,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Port of {@code dockertests/tests/sbr/test_tombstones.py}: verifies that the bulk reader correctly
- * filters tombstoned rows in three scenarios — basic (no deletes, baseline), partition tombstones,
+ * filters tombstoned rows in four scenarios — basic (no deletes, baseline), partition tombstones,
  * row tombstones, and range tombstones. Each @Test owns a distinct table.
  *
- * <p>Row/clustering-key values are picked distinctly so the delete-by-specific-clustering-key
- * scenarios are deterministic (the Python original assumed random collisions would be rare).
+ * <p>The dockertest's {@code basic_test} writes {@code num_rows} inserts at sparse random
+ * partition/clustering keys (collisions are statistically negligible at the [0, 1e8] range); this
+ * port mirrors that single-loop pattern. The partition/row/range tombstone scenarios use dense
+ * sequential keys, matching the dockertest and keeping the delete-by-specific-clustering-key
+ * scenarios deterministic.
  */
 class TombstonesReadTest extends DockertestBase
 {
@@ -103,12 +106,22 @@ class TombstonesReadTest extends DockertestBase
         createTestTable(partitionTombstoneTable, ddl);
         createTestTable(rowTombstoneTable, ddl);
         createTestTable(rangeTombstoneTable, ddl);
+        disableAutoCompaction(basicTable);
 
         Random random = new Random(0);
         AtomicInteger seedCounter = new AtomicInteger();
 
-        // Basic: populate and keep everything
-        populate(basicTable, basicValues, random);
+        // Basic: sparse random partition+clustering keys in a single loop, matching the dockertest
+        // basic_test pattern. NUM_ROWS * NUM_COLS chosen to match the volume of the other scenarios.
+        for (int i = 0; i < NUM_ROWS * NUM_COLS; i++)
+        {
+            long partitionKey = Math.abs(random.nextLong()) % 100_000_000L;
+            long clusteringKey = Math.abs(random.nextLong()) % 100_000_000L;
+            long value = Math.abs(random.nextLong()) % 100_000_000L;
+            execute(String.format("INSERT INTO %s (a, b, c) VALUES (%d, %d, %d);",
+                                  basicTable, partitionKey, clusteringKey, value));
+            basicValues.put(partitionKey + ":" + clusteringKey, value);
+        }
         flushKeyspace(basicTable);
 
         // Partition tombstones: delete partitions [0, 25) — 25 of 100 partitions
