@@ -17,10 +17,9 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -36,36 +35,28 @@ import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_rows.py}: inserts rows across multiple SSTables
- * (flushing between batches) and asserts the bulk reader returns every (a,b) -> c triple.
- *
- * <p><b>Flush cadence:</b> the original {@code test_rows.py} calls {@code flush_data()} outside
- * its outer SSTable loop, producing only one SSTable despite the {@code NUM_SSTABLES} name.
- * This port flushes per outer iteration so {@code NUM_SSTABLES} is honoured — matching the
- * cadence used by the better-written {@code test_udts.py}/{@code test_nested.py} dockertests
- * in the same suite and exercising the multi-SSTable merge path.
+ * Verifies the bulk reader correctly handles {@code WITH CLUSTERING ORDER BY (b DESC)} and does
+ * not return duplicate rows when the same clustering key is written in a later SSTable — the
+ * later write must overwrite on the merge path.
  */
-class BasicRowsReadTest extends DockertestBase
+class ClusteringOrderByReadTest extends SharedClusterSparkIntegrationTestBase
 {
-    static final int NUM_SSTABLES = 5;
     static final int NUM_ROWS = 5;
     static final int NUM_COLS = 4;
 
-    QualifiedName table = uniqueTestTableFullName(TEST_KEYSPACE, "basic_rows");
+    QualifiedName table = uniqueTestTableFullName(TEST_KEYSPACE, "clust_order");
     Map<String, Long> expected = new HashMap<>();
 
     @Test
-    void testAllRowsReturned()
+    void testClusteringOrderByNoDuplicates()
     {
         Dataset<Row> data = bulkReaderDataFrame(table).load();
-        assertThat(data.count()).isEqualTo((long) NUM_SSTABLES * NUM_ROWS * NUM_COLS);
+        assertThat(data.count()).isEqualTo(expected.size());
 
-        List<Row> rows = data.collectAsList();
-        assertThat(rows).hasSize(NUM_SSTABLES * NUM_ROWS * NUM_COLS);
-        for (Row row : rows)
+        for (Row row : data.collectAsList())
         {
             String key = row.getLong(0) + ":" + row.getLong(1);
-            assertThat(expected).containsKey(key);
+            assertThat(expected).as("unexpected key %s", key).containsKey(key);
             assertThat(row.getLong(2)).isEqualTo(expected.get(key));
         }
     }
@@ -74,25 +65,30 @@ class BasicRowsReadTest extends DockertestBase
     protected void initializeSchemaForTest()
     {
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
-        createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b));");
+        createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, " +
+                               "PRIMARY KEY (a, b)) WITH CLUSTERING ORDER BY (b DESC);");
         disableAutoCompaction(table);
 
         Random random = new Random(0);
         long partitionKey = 0;
-        for (int s = 0; s < NUM_SSTABLES; s++)
+        for (int r = 0; r < NUM_ROWS; r++)
         {
-            for (int r = 0; r < NUM_ROWS; r++)
+            for (long clusteringKey = 0; clusteringKey < NUM_COLS; clusteringKey++)
             {
-                for (long clusteringKey = 0; clusteringKey < NUM_COLS; clusteringKey++)
-                {
-                    long value = random.nextInt(101);
-                    expected.put(partitionKey + ":" + clusteringKey, value);
-                    execute(String.format("INSERT INTO %s (a, b, c) VALUES (%d, %d, %d);",
-                                          table, partitionKey, clusteringKey, value));
-                }
-                partitionKey++;
+                long value = random.nextInt(101);
+                expected.put(partitionKey + ":" + clusteringKey, value);
+                execute(String.format("INSERT INTO %s (a, b, c) VALUES (%d, %d, %d);",
+                                      table, partitionKey, clusteringKey, value));
             }
-            flushKeyspace(table);
+            partitionKey++;
         }
+        flushKeyspace(table);
+
+        // rewrite smallest clustering key (0, 0) in a separate SSTable — would produce duplicates
+        // if WITH CLUSTERING ORDER BY were not honored on the merge path
+        long rewriteValue = random.nextInt(101);
+        expected.put("0:0", rewriteValue);
+        execute(String.format("INSERT INTO %s (a, b, c) VALUES (0, 0, %d);", table, rewriteValue));
+        flushKeyspace(table);
     }
 }

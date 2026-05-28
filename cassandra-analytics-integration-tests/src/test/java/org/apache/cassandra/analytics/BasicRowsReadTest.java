@@ -17,8 +17,11 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -33,50 +36,39 @@ import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_max_index_interval.py}: creates a table with custom
- * {@code max_index_interval=4096 AND min_index_interval=32}, loads a larger dataset across
- * multiple SSTables, and performs a bulk read.
- *
- * <p><b>Coverage scope.</b> The original Python test grepped Spark stdout for the warning
- * "Cannot read index summary because min_index_interval changed from" and failed if present —
- * a regression check for an index-summary loading bug. That log-grep cannot be reproduced
- * in-process because the warning originates inside the dtest-bridge classloader. This port
- * therefore covers only:
- * <ul>
- *   <li>that the bulk reader does not error or bail out on a table with non-default index
- *       intervals, and</li>
- *   <li>that the read returns the expected row count.</li>
- * </ul>
- * It does <b>not</b> catch a regression that re-introduces the warning while still returning
- * correct rows. Restoring full regression coverage requires test-framework log-capture support.
- *
- * <p><b>Flush cadence:</b> the original Python flushes once outside its outer loop (producing a
- * single SSTable despite the {@code NUM_SSTABLES} name); this port flushes per outer iteration
- * so {@code NUM_SSTABLES} SSTables are actually produced and the bulk reader's multi-SSTable
- * merge path is exercised.
+ * Inserts rows across multiple SSTables (flushing between batches) and asserts the bulk reader
+ * returns every (a,b) -&gt; c triple, exercising the multi-SSTable merge path.
  */
-class MaxIndexIntervalReadTest extends DockertestBase
+class BasicRowsReadTest extends SharedClusterSparkIntegrationTestBase
 {
-    static final int NUM_SSTABLES = 10;
-    static final int NUM_ROWS = 100;
-    static final int NUM_COLS = 8;
+    static final int NUM_SSTABLES = 5;
+    static final int NUM_ROWS = 5;
+    static final int NUM_COLS = 4;
 
-    QualifiedName table = uniqueTestTableFullName(TEST_KEYSPACE, "max_idx_interval");
-    long expectedRowCount;
+    QualifiedName table = uniqueTestTableFullName(TEST_KEYSPACE, "basic_rows");
+    Map<String, Long> expected = new HashMap<>();
 
     @Test
-    void testBulkReadSucceedsWithCustomIndexIntervals()
+    void testAllRowsReturned()
     {
         Dataset<Row> data = bulkReaderDataFrame(table).load();
-        assertThat(data.count()).isEqualTo(expectedRowCount);
+        assertThat(data.count()).isEqualTo((long) NUM_SSTABLES * NUM_ROWS * NUM_COLS);
+
+        List<Row> rows = data.collectAsList();
+        assertThat(rows).hasSize(NUM_SSTABLES * NUM_ROWS * NUM_COLS);
+        for (Row row : rows)
+        {
+            String key = row.getLong(0) + ":" + row.getLong(1);
+            assertThat(expected).containsKey(key);
+            assertThat(row.getLong(2)).isEqualTo(expected.get(key));
+        }
     }
 
     @Override
     protected void initializeSchemaForTest()
     {
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
-        createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b)) "
-                               + "WITH max_index_interval=4096 AND min_index_interval=32;");
+        createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b));");
         disableAutoCompaction(table);
 
         Random random = new Random(0);
@@ -88,6 +80,7 @@ class MaxIndexIntervalReadTest extends DockertestBase
                 for (long clusteringKey = 0; clusteringKey < NUM_COLS; clusteringKey++)
                 {
                     long value = random.nextInt(101);
+                    expected.put(partitionKey + ":" + clusteringKey, value);
                     execute(String.format("INSERT INTO %s (a, b, c) VALUES (%d, %d, %d);",
                                           table, partitionKey, clusteringKey, value));
                 }
@@ -95,6 +88,5 @@ class MaxIndexIntervalReadTest extends DockertestBase
             }
             flushKeyspace(table);
         }
-        expectedRowCount = (long) NUM_SSTABLES * NUM_ROWS * NUM_COLS;
     }
 }

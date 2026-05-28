@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
 import java.util.Random;
 
@@ -30,45 +30,50 @@ import org.apache.spark.sql.Row;
 import static org.apache.cassandra.testing.TestUtils.DC1_RF1;
 import static org.apache.cassandra.testing.TestUtils.TEST_KEYSPACE;
 import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
-import static org.apache.spark.sql.functions.sum;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_aggregation.py}: bulk reads a multi-SSTable table
- * and verifies {@code SUM(c)} via Spark matches the sum of values written via CQL.
+ * Creates a table with custom {@code max_index_interval=4096 AND min_index_interval=32}, loads a
+ * larger dataset across multiple SSTables, and performs a bulk read.
  *
- * <p><b>Flush cadence:</b> the original Python flushes once outside its outer loop (producing a
- * single SSTable despite the {@code NUM_SSTABLES} name); this port flushes per outer iteration
- * so {@code NUM_SSTABLES} SSTables are actually produced and the bulk reader's multi-SSTable
- * merge path is exercised.
+ * <p><b>Coverage scope.</b> This test covers only:
+ * <ul>
+ *   <li>that the bulk reader does not error or bail out on a table with non-default index
+ *       intervals, and</li>
+ *   <li>that the read returns the expected row count.</li>
+ * </ul>
+ * It does <b>not</b> catch a regression that would emit the
+ * "Cannot read index summary because min_index_interval changed from" warning while still
+ * returning correct rows — that warning originates inside the dtest-bridge classloader and
+ * cannot be log-grepped from in-process tests. Restoring full regression coverage requires
+ * test-framework log-capture support.
  */
-class SumAggregationReadTest extends DockertestBase
+class MaxIndexIntervalReadTest extends SharedClusterSparkIntegrationTestBase
 {
-    static final int NUM_SSTABLES = 5;
-    static final int NUM_ROWS = 5;
-    static final int NUM_COLS = 4;
+    static final int NUM_SSTABLES = 10;
+    static final int NUM_ROWS = 100;
+    static final int NUM_COLS = 8;
 
-    QualifiedName table = uniqueTestTableFullName(TEST_KEYSPACE, "sum_agg");
-    long expectedSum;
+    QualifiedName table = uniqueTestTableFullName(TEST_KEYSPACE, "max_idx_interval");
+    long expectedRowCount;
 
     @Test
-    void testSumMatches()
+    void testBulkReadSucceedsWithCustomIndexIntervals()
     {
         Dataset<Row> data = bulkReaderDataFrame(table).load();
-        Row row = data.agg(sum("c").alias("sum_c")).collectAsList().get(0);
-        assertThat(row.getLong(0)).isEqualTo(expectedSum);
+        assertThat(data.count()).isEqualTo(expectedRowCount);
     }
 
     @Override
     protected void initializeSchemaForTest()
     {
         createTestKeyspace(TEST_KEYSPACE, DC1_RF1);
-        createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b));");
+        createTestTable(table, "CREATE TABLE IF NOT EXISTS %s (a bigint, b bigint, c bigint, PRIMARY KEY (a, b)) "
+                               + "WITH max_index_interval=4096 AND min_index_interval=32;");
         disableAutoCompaction(table);
 
         Random random = new Random(0);
         long partitionKey = 0;
-        long sum = 0;
         for (int s = 0; s < NUM_SSTABLES; s++)
         {
             for (int r = 0; r < NUM_ROWS; r++)
@@ -76,7 +81,6 @@ class SumAggregationReadTest extends DockertestBase
                 for (long clusteringKey = 0; clusteringKey < NUM_COLS; clusteringKey++)
                 {
                     long value = random.nextInt(101);
-                    sum += value;
                     execute(String.format("INSERT INTO %s (a, b, c) VALUES (%d, %d, %d);",
                                           table, partitionKey, clusteringKey, value));
                 }
@@ -84,6 +88,6 @@ class SumAggregationReadTest extends DockertestBase
             }
             flushKeyspace(table);
         }
-        expectedSum = sum;
+        expectedRowCount = (long) NUM_SSTABLES * NUM_ROWS * NUM_COLS;
     }
 }

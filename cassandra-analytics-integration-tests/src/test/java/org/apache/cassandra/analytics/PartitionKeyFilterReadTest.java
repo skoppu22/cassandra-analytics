@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
 import java.util.HashMap;
 import java.util.List;
@@ -39,19 +39,13 @@ import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_key_filter.py}: verifies partition-key pushdown,
- * both single-value ({@code a = N}) and multi-value ({@code a IN (...)}) forms.
+ * Verifies partition-key pushdown on the bulk reader, both single-value ({@code a = N}) and
+ * multi-value ({@code a IN (...)}) forms.
  *
- * <p>The OSS bulk reader's {@code CassandraDataSource} accepts partition-key predicates as standard
- * Spark filters; this test uses {@code Dataset#filter} to mirror the original Python which passed a
- * {@code filter_exp} param to the SBR Spark job.
- *
- * <p><b>Flush cadence:</b> the original Python flushes once outside its outer loop (producing a
- * single SSTable despite the {@code NUM_SSTABLES} name); this port flushes per outer iteration
- * so {@code NUM_SSTABLES} SSTables are actually produced and the bulk reader's multi-SSTable
- * merge path is exercised.
+ * <p>The OSS bulk reader's {@code CassandraDataSource} accepts partition-key predicates as
+ * standard Spark filters; this test uses {@code Dataset#filter} to express them.
  */
-class PartitionKeyFilterReadTest extends DockertestBase
+class PartitionKeyFilterReadTest extends SharedClusterSparkIntegrationTestBase
 {
     static final int NUM_SSTABLES = 5;
     static final int NUM_ROWS = 5;

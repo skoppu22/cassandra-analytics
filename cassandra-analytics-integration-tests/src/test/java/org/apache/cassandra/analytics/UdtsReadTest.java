@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,13 +42,13 @@ import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_udts.py}: exercises the bulk reader on two UDTs
- * including a nested map-of-maps — {@code frozen<map<int, frozen<map<bigint, uuid>>>>}.
+ * Exercises the bulk reader on two UDTs including a nested map-of-maps —
+ * {@code frozen<map<int, frozen<map<bigint, uuid>>>>}.
  *
  * <p>UDT field access uses {@link Row#getStruct(int)} positional accessors since the schema maps
  * each UDT to a nested struct in Spark.
  */
-class UdtsReadTest extends DockertestBase
+class UdtsReadTest extends SharedClusterSparkIntegrationTestBase
 {
     static final int NUM_SSTABLES = 2;
     static final int NUM_ROWS = 50;

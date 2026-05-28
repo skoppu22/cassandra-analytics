@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,10 +42,10 @@ import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_nested.py}: exercises the bulk reader on a
- * nested-collection column — {@code map<int, frozen<list<bigint>>>}.
+ * Exercises the bulk reader on a nested-collection column —
+ * {@code map<int, frozen<list<bigint>>>}.
  */
-class NestedCollectionsReadTest extends DockertestBase
+class NestedCollectionsReadTest extends SharedClusterSparkIntegrationTestBase
 {
     static final int NUM_SSTABLES = 2;
     static final int NUM_ROWS = 50;

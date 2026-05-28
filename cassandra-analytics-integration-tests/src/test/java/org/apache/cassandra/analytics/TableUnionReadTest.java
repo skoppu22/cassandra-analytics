@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -36,13 +36,10 @@ import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_union.py}: loads two tables with the same schema via
- * the bulk reader and verifies {@code Dataset#union} returns the combined rowset.
- *
- * <p>The Python original used an Apple-SBR-specific {@code table2=} argument to the Docker Spark
- * job; OSS equivalent is standard Spark {@code Dataset#union} between two {@code bulkReaderDataFrame}s.
+ * Loads two tables with the same schema via the bulk reader and verifies Spark's
+ * {@code Dataset#union} returns the combined rowset.
  */
-class TableUnionReadTest extends DockertestBase
+class TableUnionReadTest extends SharedClusterSparkIntegrationTestBase
 {
     QualifiedName table1 = uniqueTestTableFullName(TEST_KEYSPACE, "union1");
     QualifiedName table2 = uniqueTestTableFullName(TEST_KEYSPACE, "union2");

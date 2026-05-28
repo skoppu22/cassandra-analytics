@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.cassandra.analytics.dockertests;
+package org.apache.cassandra.analytics;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,25 +35,22 @@ import static org.apache.cassandra.testing.TestUtils.uniqueTestTableFullName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of {@code dockertests/tests/sbr/test_static.py}: verifies the bulk reader correctly surfaces
- * the customer-facing STATIC column semantic — a static cell is partition-scoped, so every
- * clustering row of the partition reads back the same static value, and last-write-wins applies
- * across the partition's static cell.
+ * Verifies the bulk reader correctly surfaces the customer-facing STATIC column semantic — a
+ * static cell is partition-scoped, so every clustering row of the partition reads back the same
+ * static value, and last-write-wins applies across the partition's static cell.
  *
- * <p>The dockertest writes a fresh random static on every insert; the read-side expected value is
- * therefore the <em>last</em> static written for each partition. This port mirrors that — each
- * inner INSERT picks a new random static, and {@code expectedStaticByPartition} is overwritten on
- * every insert so the final entry is the last-written value. Cassandra's LWW resolution on the
- * static cell is what surfaces that value on read; if LWW for statics regressed, every clustering
- * row of the partition would still report the same static (because static cells are
+ * <p>This test writes a fresh random static on every insert; the read-side expected value is
+ * therefore the <em>last</em> static written for each partition. Cassandra's LWW resolution on
+ * the static cell is what surfaces that value on read; if LWW for statics regressed, every
+ * clustering row of the partition would still report the same static (because static cells are
  * partition-scoped), but it would no longer equal the last-written value.
  *
- * <p>{@code BulkReaderTest.testReadNullStaticColumn} exercises STATIC schema and null-handling but
- * uses one clustering row per partition, so the shared-across-clustering-rows behaviour isn't
- * exercised. This test fills that gap by writing multiple clustering rows per partition and
- * asserting all of them read back the partition's last-written static value.
+ * <p>{@code BulkReaderTest.testReadNullStaticColumn} exercises STATIC schema and null-handling
+ * but uses one clustering row per partition, so the shared-across-clustering-rows behaviour
+ * isn't exercised there. This test fills that gap by writing multiple clustering rows per
+ * partition and asserting all of them read back the partition's last-written static value.
  */
-class StaticColumnSharedValueReadTest extends DockertestBase
+class StaticColumnSharedValueReadTest extends SharedClusterSparkIntegrationTestBase
 {
     static final int NUM_PARTITIONS = 10;
     static final int NUM_CLUSTERING_ROWS = 20;
@@ -110,8 +107,8 @@ class StaticColumnSharedValueReadTest extends DockertestBase
                                + "PRIMARY KEY (a, b));");
         disableAutoCompaction(table);
 
-        // Mirror the dockertest: pick a fresh random static on every insert; the partition's
-        // expected static is the LAST value written (Cassandra resolves the static cell as LWW).
+        // Pick a fresh random static on every insert; the partition's expected static is the
+        // LAST value written (Cassandra resolves the static cell as LWW).
         // Seeded RNG for reproducibility on failure.
         Random random = new Random(0);
         for (long partitionKey = 0; partitionKey < NUM_PARTITIONS; partitionKey++)
