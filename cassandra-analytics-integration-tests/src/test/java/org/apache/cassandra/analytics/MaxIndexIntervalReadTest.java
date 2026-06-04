@@ -36,17 +36,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Creates a table with custom {@code max_index_interval=4096 AND min_index_interval=32}, loads a
  * larger dataset across multiple SSTables, and performs a bulk read.
  *
- * <p><b>Coverage scope.</b> This test covers only:
+ * <p><b>Coverage scope.</b> This test covers :
  * <ul>
  *   <li>that the bulk reader does not error or bail out on a table with non-default index
  *       intervals, and</li>
  *   <li>that the read returns the expected row count.</li>
  * </ul>
- * It does <b>not</b> catch a regression that would emit the
- * "Cannot read index summary because min_index_interval changed from" warning while still
- * returning correct rows — that warning originates inside the dtest-bridge classloader and
- * cannot be log-grepped from in-process tests. Restoring full regression coverage requires
- * test-framework log-capture support.
  */
 class MaxIndexIntervalReadTest extends SharedClusterSparkIntegrationTestBase
 {

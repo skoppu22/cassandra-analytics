@@ -57,8 +57,15 @@ class TableUnionReadTest extends SharedClusterSparkIntegrationTestBase
         Dataset<Row> union = data1.union(data2);
 
         Map<Long, String> expected = new HashMap<>();
-        for (Object[] v : VALUES_1) expected.put((Long) v[0], (String) v[1]);
-        for (Object[] v : VALUES_2) expected.put((Long) v[0], (String) v[1]);
+        for (Object[] v : VALUES_1)
+        {
+            expected.put((Long) v[0], (String) v[1]);
+        }
+
+        for (Object[] v : VALUES_2)
+        {
+            expected.put((Long) v[0], (String) v[1]);
+        }
 
         assertThat(union.count()).isEqualTo(expected.size());
         for (Row row : union.collectAsList())
@@ -79,9 +86,14 @@ class TableUnionReadTest extends SharedClusterSparkIntegrationTestBase
         disableAutoCompaction(table1);
 
         for (Object[] v : VALUES_1)
+        {
             execute(String.format("INSERT INTO %s (pk1, col1) VALUES (%d, '%s');", table1, (long) v[0], v[1]));
-        for (Object[] v : VALUES_2)
+        }
+
+        for (Object[] v : VALUES_2) {
             execute(String.format("INSERT INTO %s (pk1, col1) VALUES (%d, '%s');", table2, (long) v[0], v[1]));
+        }
+
         flushKeyspace(table1);
     }
 }

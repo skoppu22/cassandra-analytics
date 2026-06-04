@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies that the bulk reader correctly filters tombstoned rows in four scenarios — basic
  * (no deletes, baseline), partition tombstones, row tombstones, and range tombstones. Each
- * &#64;Test owns a distinct table.
+ * test owns a distinct table.
  *
  * <p>The basic scenario writes {@code num_rows} inserts at sparse random partition/clustering
  * keys (collisions are statistically negligible at the [0, 1e8] range). The partition/row/range

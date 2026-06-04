@@ -47,7 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class NestedCollectionsReadTest extends SharedClusterSparkIntegrationTestBase
 {
-    static final int NUM_SSTABLES = 2;
+    static final int NUM_SSTABLES = 5;
     static final int NUM_ROWS = 50;
     static final int MAP_ENTRIES = 5;
     static final int LIST_ENTRIES = 10;

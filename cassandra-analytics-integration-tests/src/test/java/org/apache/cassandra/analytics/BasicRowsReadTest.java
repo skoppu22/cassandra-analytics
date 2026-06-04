@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Inserts rows across multiple SSTables (flushing between batches) and asserts the bulk reader
- * returns every (a,b) -&gt; c triple, exercising the multi-SSTable merge path.
+ * returns every (a,b) -> c triple, exercising the multi-SSTable merge path.
  */
 class BasicRowsReadTest extends SharedClusterSparkIntegrationTestBase
 {
