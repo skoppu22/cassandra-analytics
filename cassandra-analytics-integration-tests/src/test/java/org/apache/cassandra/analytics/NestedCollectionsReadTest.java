@@ -116,13 +116,19 @@ class NestedCollectionsReadTest extends SharedClusterSparkIntegrationTestBase
                     {
                         long value = Math.abs(random.nextLong()) % 100_000_000L;
                         inner.add(value);
-                        if (i > 0) listCql.append(",");
+                        if (i > 0)
+                        {
+                            listCql.append(",");
+                        }
                         listCql.append(value);
                     }
                     listCql.append("]");
 
                     nested.put(outerKey, inner);
-                    if (mapIdx++ > 0) mapCql.append(",");
+                    if (mapIdx++ > 0)
+                    {
+                        mapCql.append(",");
+                    }
                     mapCql.append(outerKey).append(":").append(listCql);
                 }
                 mapCql.append("}");

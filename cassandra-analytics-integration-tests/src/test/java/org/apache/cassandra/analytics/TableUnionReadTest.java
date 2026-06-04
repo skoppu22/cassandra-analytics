@@ -90,7 +90,8 @@ class TableUnionReadTest extends SharedClusterSparkIntegrationTestBase
             execute(String.format("INSERT INTO %s (pk1, col1) VALUES (%d, '%s');", table1, (long) v[0], v[1]));
         }
 
-        for (Object[] v : VALUES_2) {
+        for (Object[] v : VALUES_2)
+        {
             execute(String.format("INSERT INTO %s (pk1, col1) VALUES (%d, '%s');", table2, (long) v[0], v[1]));
         }
 

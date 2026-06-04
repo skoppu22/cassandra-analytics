@@ -155,7 +155,12 @@ class TombstonesReadTest extends SharedClusterSparkIntegrationTestBase
         {
             int r1 = rangeRand.nextInt(NUM_COLS);
             int r2 = rangeRand.nextInt(NUM_COLS);
-            if (r1 > r2) { int tmp = r1; r1 = r2; r2 = tmp; }
+            if (r1 > r2)
+            {
+                int tmp = r1;
+                r1 = r2;
+                r2 = tmp;
+            }
             if (r1 == r2) r2 = Math.min(r1 + 1, NUM_COLS);
             execute(String.format("DELETE FROM %s WHERE a = %d AND b >= %d AND b < %d;",
                                   rangeTombstoneTable, partitionKey, r1, r2));
